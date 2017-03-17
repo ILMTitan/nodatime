@@ -24,7 +24,11 @@ namespace NodaTime.Benchmarks
         // ReSharper disable once UnusedMember.Local
         private static void Main(string[] args)
         {
-            var bigQueryConfig = new BigQueryConfig("someCommit", "nodatime-benchmarks-test", "NodaTimeBenchmarks");
+            var localConfig = GetLocalConfigFromArgs(ref args);
+
+            // This whole secion will be back to one line once a new version of BenchmarkDotNet with an optinal config
+            // parameter of the BenchmarkSwitcher is released.
+
             // Reflection to call internal methods.
             MethodInfo readArgumentList =
                 typeof(TypeParser).GetMethod("ReadArgumentList", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -51,7 +55,7 @@ namespace NodaTime.Benchmarks
             var globalChronometer = Chronometer.Start();
 
             var config = ManualConfig.Union(DefaultConfig.Instance, ManualConfig.Parse(args));
-            config = ManualConfig.Union(config, bigQueryConfig);
+            config = ManualConfig.Union(config, localConfig);
 
             var methods =
                 (IEnumerable<TypeParser.TypeWithMethods>) matchingTypesWithMethods.Invoke(
@@ -68,6 +72,36 @@ namespace NodaTime.Benchmarks
 
             var clockSpan = globalChronometer.Stop();
             logTotalTime.Invoke(null, new object[] {logger, clockSpan.GetTimeSpan(), "Global total time"});
+        }
+
+        private static IConfig GetLocalConfigFromArgs(ref string[] args)
+        {
+            var commitId = "";
+            IConfig localConfig;
+            string commitArg =
+                args.FirstOrDefault((arg) => arg.StartsWith("--commit=", StringComparison.OrdinalIgnoreCase));
+            if (commitArg != null)
+            {
+                commitId = commitArg.Substring(commitArg.IndexOf("=", StringComparison.Ordinal) + 1);
+                commitId = commitId.Trim().Trim('"');
+                args = args.Except(Enumerable.Repeat(commitArg, 1)).ToArray();
+            }
+            if (args.Any((arg) =>
+            {
+                return "--export-bigquery".Equals(arg, StringComparison.OrdinalIgnoreCase) ||
+                    "-ebq".Equals(arg, StringComparison.OrdinalIgnoreCase);
+            }))
+            {
+                localConfig =
+                    ManualConfig.CreateEmpty()
+                        .With(new BigQueryExporter(commitId, "nodatime-benchmarks-test", "NodaTimeBenchmarks"));
+                args = args.Except(new[] {"--export-bigquery", "-ebq"}, StringComparer.OrdinalIgnoreCase).ToArray();
+            }
+            else
+            {
+                localConfig = DefaultConfig.Instance;
+            }
+            return localConfig;
         }
     }
 }
