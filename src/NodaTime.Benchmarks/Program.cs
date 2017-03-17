@@ -77,16 +77,29 @@ namespace NodaTime.Benchmarks
         private static IConfig GetLocalConfigFromArgs(ref string[] args)
         {
             string[] exportBigQueryArgs = {"--export-bigquery", "-ebq"};
-            if (args.Intersect(exportBigQueryArgs, StringComparer.OrdinalIgnoreCase).Any())
+            bool exportBigQuery = args.Intersect(exportBigQueryArgs, StringComparer.OrdinalIgnoreCase).Any();
+            string[] exportDatastoreArgs = {"--export-datastore", "-egcd"};
+            bool exportCloudDatastore = args.Intersect(exportDatastoreArgs, StringComparer.OrdinalIgnoreCase).Any();
+            if (exportBigQuery || exportCloudDatastore)
             {
                 var commitId = GetArgValue(ref args, "--commit=", "");
                 var googleProjectId = GetArgValue(ref args, "--project=", "nodatime-benchmarks-test");
                 googleProjectId = GetArgValue(ref args, "--projectId=", googleProjectId);
-                var datasetId = GetArgValue(ref args, "--dataset=", "NodaTimeBenchmarks");
-                datasetId = GetArgValue(ref args, "--datasetId=", datasetId);
-                args = args.Except(exportBigQueryArgs, StringComparer.OrdinalIgnoreCase).ToArray();
-                return ManualConfig.CreateEmpty()
-                    .With(new BigQueryExporter(commitId, googleProjectId, datasetId));
+                IConfig config = ManualConfig.CreateEmpty();
+                if (exportBigQuery)
+                {
+                    var datasetId = GetArgValue(ref args, "--dataset=", "NodaTimeBenchmarks");
+                    datasetId = GetArgValue(ref args, "--datasetId=", datasetId);
+                    args = args.Except(exportBigQueryArgs, StringComparer.OrdinalIgnoreCase).ToArray();
+                    config = config.With(new BigQueryExporter(commitId, googleProjectId, datasetId));
+                }
+                if (exportCloudDatastore)
+                {
+                    var gcdNamespace = GetArgValue(ref args, "--namespace=", "");
+                    args = args.Except(exportDatastoreArgs, StringComparer.OrdinalIgnoreCase).ToArray();
+                    config = config.With(new DatastoreExporter(commitId, googleProjectId, gcdNamespace));
+                }
+                return config;
             }
             else
             {
