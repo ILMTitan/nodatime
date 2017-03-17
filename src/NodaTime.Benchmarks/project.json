@@ -15,12 +15,12 @@
   },
 
   "dependencies": {
-    "BenchmarkDotNet": "0.10.1",
+    "BenchmarkDotNet": "0.10.3",
     "NodaTime": { "target": "project" },
     "NodaTime.Serialization.JsonNet": { "target": "project" },
     "NodaTime.Testing": { "target": "project" },
-    "Newtonsoft.Json": "9.0.1"
-  },
+    "Newtonsoft.Json": "9.0.1",
+    "BenchmarkDotNetBigQuery": "1.0.0-alpha"},
 
   "testRunner": "nunit",
 
