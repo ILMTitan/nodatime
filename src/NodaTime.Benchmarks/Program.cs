@@ -76,32 +76,37 @@ namespace NodaTime.Benchmarks
 
         private static IConfig GetLocalConfigFromArgs(ref string[] args)
         {
-            var commitId = "";
-            IConfig localConfig;
-            string commitArg =
-                args.FirstOrDefault((arg) => arg.StartsWith("--commit=", StringComparison.OrdinalIgnoreCase));
-            if (commitArg != null)
+            string[] exportBigQueryArgs = {"--export-bigquery", "-ebq"};
+            if (args.Intersect(exportBigQueryArgs, StringComparer.OrdinalIgnoreCase).Any())
             {
-                commitId = commitArg.Substring(commitArg.IndexOf("=", StringComparison.Ordinal) + 1);
-                commitId = commitId.Trim().Trim('"');
-                args = args.Except(Enumerable.Repeat(commitArg, 1)).ToArray();
-            }
-            if (args.Any((arg) =>
-            {
-                return "--export-bigquery".Equals(arg, StringComparison.OrdinalIgnoreCase) ||
-                    "-ebq".Equals(arg, StringComparison.OrdinalIgnoreCase);
-            }))
-            {
-                localConfig =
-                    ManualConfig.CreateEmpty()
-                        .With(new BigQueryExporter(commitId, "nodatime-benchmarks-test", "NodaTimeBenchmarks"));
-                args = args.Except(new[] {"--export-bigquery", "-ebq"}, StringComparer.OrdinalIgnoreCase).ToArray();
+                var commitId = GetArgValue(ref args, "--commit=", "");
+                var googleProjectId = GetArgValue(ref args, "--project=", "nodatime-benchmarks-test");
+                googleProjectId = GetArgValue(ref args, "--projectId=", googleProjectId);
+                var datasetId = GetArgValue(ref args, "--dataset=", "NodaTimeBenchmarks");
+                datasetId = GetArgValue(ref args, "--datasetId=", datasetId);
+                args = args.Except(exportBigQueryArgs, StringComparer.OrdinalIgnoreCase).ToArray();
+                return ManualConfig.CreateEmpty()
+                    .With(new BigQueryExporter(commitId, googleProjectId, datasetId));
             }
             else
             {
-                localConfig = DefaultConfig.Instance;
+                return DefaultConfig.Instance;
             }
-            return localConfig;
+        }
+
+        private static string GetArgValue(ref string[] args, string argPrefix, string defaultValue)
+        {
+            string fullArg =
+                args.FirstOrDefault((arg) => arg.StartsWith(argPrefix, StringComparison.OrdinalIgnoreCase));
+            if (fullArg != null)
+            {
+                args = args.Except(new[] {fullArg}).ToArray();
+                return fullArg.Substring(argPrefix.Length).Trim().Trim('"');
+            }
+            else
+            {
+                return defaultValue;
+            }
         }
     }
 }
